@@ -10,6 +10,8 @@ Use this when you want the automated multi-worker version. Use `Get-Shit-Done` w
 git clone git@github.com:OmarDadabhoy/GetShitDoneSweeper.git
 cd GetShitDoneSweeper
 node --version   # needs Node 20+
+cp config/sources.example.json config/sources.json
+cp config/notifications.example.json config/notifications.json
 ```
 
 No install step is required right now; there are no runtime dependencies.
@@ -133,3 +135,5 @@ npm test
 node --check src/cli.js
 node src/cli.js sources --config config/sources.json
 ```
+
+Real config files are gitignored. Commit only `config/*.example.json`.
