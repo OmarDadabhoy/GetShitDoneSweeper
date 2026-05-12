@@ -1,0 +1,25 @@
+{
+  "sources": [
+    {
+      "id": "local-todo",
+      "type": "text_file",
+      "enabled": true,
+      "path": "../../TodoSkill/inbox/todo.md"
+    },
+    {
+      "id": "google-docs",
+      "type": "google_docs",
+      "enabled": false,
+      "url": "https://docs.google.com/document/d/YOUR_DOCUMENT_ID/edit",
+      "auth": "public"
+    },
+    {
+      "id": "github-issues",
+      "type": "github_issues",
+      "enabled": false,
+      "repo": "owner/repo",
+      "label": "get-shit-done",
+      "limit": 20
+    }
+  ]
+}

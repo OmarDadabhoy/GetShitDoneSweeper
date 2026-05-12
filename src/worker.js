@@ -1,0 +1,148 @@
+#!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
+import { spawn } from "node:child_process";
+import { repoRoot, readJson, writeJson } from "./fs-utils.js";
+import { makeRunDir, transitionJob } from "./jobs.js";
+import { renderWorkerPrompt } from "./prompt.js";
+
+function parseArgs(argv) {
+  const args = { _: [] };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (!arg.startsWith("--")) {
+      args._.push(arg);
+      continue;
+    }
+    const key = arg.slice(2);
+    const next = argv[index + 1];
+    if (!next || next.startsWith("--")) {
+      args[key] = true;
+    } else {
+      args[key] = next;
+      index += 1;
+    }
+  }
+  return args;
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const root = path.resolve(args.root ?? repoRoot());
+  const jobFile = args._[0];
+  const mode = args.mode ?? "dry-run";
+  const workspace = path.resolve(args.workspace ?? root);
+  const model = args.model ?? process.env.GSD_CODEX_MODEL ?? "gpt-5.5";
+  const agentCommand = args["agent-command"] ?? process.env.GSD_AGENT_CMD ?? "";
+
+  if (!jobFile) throw new Error("usage: node src/worker.js <job.json> [--mode dry-run|execute]");
+  if (!["dry-run", "execute"].includes(mode)) throw new Error("mode must be dry-run or execute");
+  if (mode === "execute" && process.env.GSD_ALLOW_EXECUTE !== "1") {
+    throw new Error("Refusing execute mode unless GSD_ALLOW_EXECUTE=1 is set.");
+  }
+
+  const running = transitionJob(jobFile, "running", { worker_started_at: new Date().toISOString() });
+  const runDir = makeRunDir(root, running.job);
+  const prompt = renderWorkerPrompt({ root, job: running.job, mode, workspace });
+  const promptPath = path.join(runDir, "prompt.md");
+  const resultPath = path.join(runDir, "result.json");
+  fs.writeFileSync(promptPath, prompt);
+
+  if (mode === "dry-run") {
+    const result = {
+      status: "planned",
+      summary: "dry run only; prompt rendered but no agent was invoked",
+      prompt_path: promptPath,
+      job_id: running.job.job_id,
+    };
+    writeJson(resultPath, result);
+    transitionJob(running.file, "queued", { last_run_dir: runDir, last_result: result.status });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  const result = await runAgent({ prompt, promptPath, runDir, resultPath, workspace, model, agentCommand });
+  const nextState = result.status === "done" ? "done" : "blocked";
+  transitionJob(running.file, nextState, {
+    last_run_dir: runDir,
+    last_result: result.status,
+    worker_finished_at: new Date().toISOString(),
+  });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+function runAgent({ prompt, promptPath, runDir, resultPath, workspace, model, agentCommand }) {
+  if (agentCommand) {
+    const command = agentCommand
+      .replaceAll("{prompt_file}", promptPath)
+      .replaceAll("{run_dir}", runDir)
+      .replaceAll("{workspace}", workspace);
+    return spawnShell(command, "", runDir, resultPath);
+  }
+
+  const outputLastMessage = path.join(runDir, "agent.final.md");
+  const args = [
+    "exec",
+    "--cd",
+    workspace,
+    "--model",
+    model,
+    "--sandbox",
+    "danger-full-access",
+    "-c",
+    'approval_policy="never"',
+    "--output-last-message",
+    outputLastMessage,
+    "--json",
+    "-",
+  ];
+  return spawnCommand("codex", args, prompt, runDir, resultPath);
+}
+
+function spawnShell(command, input, cwd, resultPath) {
+  return spawnCommand(process.env.SHELL ?? "/bin/sh", ["-lc", command], input, cwd, resultPath);
+}
+
+function spawnCommand(command, args, input, cwd, resultPath) {
+  return new Promise((resolve) => {
+    const stdoutPath = path.join(cwd, "agent.stdout.log");
+    const stderrPath = path.join(cwd, "agent.stderr.log");
+    const child = spawn(command, args, { cwd, stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => {
+      const result = { status: "blocked", summary: error.message, verification: "", follow_up: "" };
+      writeJson(resultPath, result);
+      resolve(result);
+    });
+    child.on("close", (code) => {
+      fs.writeFileSync(stdoutPath, stdout);
+      fs.writeFileSync(stderrPath, stderr);
+      const status = code === 0 ? "done" : "blocked";
+      const result = {
+        status,
+        exit_code: code,
+        summary: status === "done" ? "agent completed" : "agent failed",
+        verification: status === "done" ? "agent process exited 0" : stderr || stdout,
+        follow_up: "",
+      };
+      writeJson(resultPath, result);
+      resolve(result);
+    });
+    child.stdin.end(input);
+  });
+}
+
+main().catch((error) => {
+  console.error(error.stack || error.message);
+  process.exit(1);
+});

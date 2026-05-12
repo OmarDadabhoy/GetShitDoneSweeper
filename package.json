@@ -1,0 +1,18 @@
+{
+  "name": "get-shit-done-sweeper",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "intake": "node src/cli.js intake",
+    "dispatch": "node src/cli.js dispatch",
+    "sweep": "node src/cli.js sweep",
+    "watch": "node src/cli.js watch",
+    "worker": "node src/worker.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

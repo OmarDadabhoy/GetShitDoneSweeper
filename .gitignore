@@ -1,0 +1,9 @@
+.DS_Store
+state/jobs/queued/*.json
+state/jobs/running/*.json
+state/jobs/done/*.json
+state/jobs/blocked/*.json
+state/runs/*
+!state/runs/.gitkeep
+state/source-cache/
+*.log
