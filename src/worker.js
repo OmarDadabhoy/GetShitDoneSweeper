@@ -5,6 +5,8 @@ import { spawn } from "node:child_process";
 import { repoRoot, readJson, writeJson } from "./fs-utils.js";
 import { makeRunDir, transitionJob } from "./jobs.js";
 import { renderWorkerPrompt } from "./prompt.js";
+import { markTaskDone } from "./writeback.js";
+import { sendNotification } from "./notify.js";
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -62,6 +64,31 @@ async function main() {
   }
 
   const result = await runAgent({ prompt, promptPath, runDir, resultPath, workspace, model, agentCommand });
+  if (result.status === "done") {
+    try {
+      result.writeback = await markTaskDone(running.job.task);
+      writeJson(resultPath, result);
+    } catch (error) {
+      result.status = "blocked";
+      result.writeback = {
+        status: "failed",
+        error: error.message,
+      };
+      writeJson(resultPath, result);
+    }
+  }
+  try {
+    result.notification = await sendNotification({
+      root,
+      event: result.status === "done" ? "done" : "needs_human",
+      task: running.job.task.title,
+      body: result.verification || result.summary || JSON.stringify(result),
+    });
+    writeJson(resultPath, result);
+  } catch (error) {
+    result.notification = { status: "failed", error: error.message };
+    writeJson(resultPath, result);
+  }
   const nextState = result.status === "done" ? "done" : "blocked";
   transitionJob(running.file, nextState, {
     last_run_dir: runDir,

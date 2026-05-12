@@ -22,21 +22,36 @@ export function parseTodoText(text, source) {
     }
     if (inFence) continue;
 
-    const checkbox = checkboxRe.exec(line);
-    if (checkbox) {
-      if (checkbox.groups.mark === " ") {
-        tasks.push(makeTask(source, checkbox.groups.title, lineNumber));
-      }
-      continue;
-    }
-
-    const todo = todoRe.exec(line);
-    if (todo) {
-      tasks.push(makeTask(source, todo.groups.title, lineNumber));
-    }
+    const parsed = parseTodoLine(line);
+    if (parsed?.actionable) tasks.push(makeTask(source, parsed.title, lineNumber));
   }
 
   return tasks;
+}
+
+export function parseTodoLine(line) {
+  const checkbox = checkboxRe.exec(line);
+  if (checkbox) {
+    const markerOffset = line.indexOf("[ ]");
+    return {
+      actionable: checkbox.groups.mark === " ",
+      kind: "checkbox",
+      title: checkbox.groups.title.trim(),
+      markerOffset,
+      markerLength: 3,
+    };
+  }
+
+  const todo = todoRe.exec(line);
+  if (!todo) return null;
+  const marker = /TODO/i.exec(line);
+  return {
+    actionable: true,
+    kind: "todo",
+    title: todo.groups.title.trim(),
+    markerOffset: marker?.index ?? 0,
+    markerLength: 4,
+  };
 }
 
 function makeTask(source, title, lineNumber) {

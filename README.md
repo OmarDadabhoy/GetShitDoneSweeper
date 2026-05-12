@@ -49,6 +49,7 @@ Supported source types:
 
 - `text_file`: parse `- [ ] ...` and `TODO: ...` from a local Markdown/text file.
 - `google_docs`: parse the plain-text export of a Google Doc.
+- `notion_page`: read tasks from a Notion page and write back completion.
 - `github_issues`: read open GitHub issues through the `gh` CLI.
 
 ### Local Text File
@@ -74,7 +75,8 @@ Public or published doc:
   "type": "google_docs",
   "enabled": true,
   "url": "https://docs.google.com/document/d/YOUR_DOCUMENT_ID/edit",
-  "auth": "public"
+  "auth": "public",
+  "writeback": "none"
 }
 ```
 
@@ -86,7 +88,8 @@ Private doc using `gcloud`:
   "type": "google_docs",
   "enabled": true,
   "document_id": "YOUR_DOCUMENT_ID",
-  "auth": "gcloud"
+  "auth": "gcloud",
+  "writeback": "mark_done"
 }
 ```
 
@@ -94,6 +97,47 @@ Private auth can also use:
 
 - `token_env`: environment variable containing a Bearer token.
 - `token_command`: command that prints a Bearer token.
+
+Google Docs write-back modes:
+
+- `mark_done`: replace `[ ]` with `[x]`, or replace `TODO` with `DONE`.
+- `delete`: clear the task paragraph text while leaving the paragraph break in place.
+- `none`: read only.
+
+Write-back happens after a worker finishes successfully in `execute` mode. It uses the Google Docs API, so the token needs Docs read/write access.
+
+### Notion Page
+
+Create a Notion integration, share the page with it, then set:
+
+```bash
+export NOTION_TOKEN='secret_...'
+```
+
+Enable the source:
+
+```json
+{
+  "id": "notion-page",
+  "type": "notion_page",
+  "enabled": true,
+  "url": "https://www.notion.so/YOUR_PAGE_ID",
+  "token_env": "NOTION_TOKEN",
+  "writeback": "mark_done",
+  "recursive": false
+}
+```
+
+Supported Notion task blocks:
+
+- unchecked Notion `to_do` blocks
+- paragraph/list blocks containing `- [ ] Task`
+- paragraph/list blocks containing `TODO: Task`
+
+Notion write-back modes:
+
+- `mark_done`: check Notion `to_do` blocks, replace `[ ]` with `[x]`, or replace `TODO` with `DONE`.
+- `delete`: archive the Notion block.
 
 ### GitHub Issues
 
@@ -201,6 +245,44 @@ Generated jobs and runs are ignored by git. The `.gitkeep` files keep the direct
 - Workers ask before externally visible or destructive actions.
 - Private sources are opt-in through config.
 - Every run stores the exact prompt sent to the agent.
+- Completion and needs-human notifications are opt-in through `config/notifications.json`.
+
+## Email Notifications
+
+Notifications are disabled by default. Configure `config/notifications.json`.
+
+Command-based email example:
+
+```json
+{
+  "enabled": true,
+  "method": "command",
+  "to": ["you@example.com"],
+  "subject_prefix": "[Get Shit Done]",
+  "command": "mail -s {subject} {to} < {body_file}"
+}
+```
+
+SMTP example:
+
+```json
+{
+  "enabled": true,
+  "method": "smtp",
+  "to": ["you@example.com"],
+  "subject_prefix": "[Get Shit Done]",
+  "smtp": {
+    "host": "smtp.gmail.com",
+    "port": 587,
+    "starttls": true,
+    "from": "you@example.com",
+    "username_env": "SMTP_USERNAME",
+    "password_env": "SMTP_PASSWORD"
+  }
+}
+```
+
+Workers send `done` after successful completion and `needs_human` when blocked or waiting on input.
 
 ## Relation To Clawsweeper
 
@@ -230,7 +312,9 @@ If no jobs are created, run:
 node src/cli.js sources --config config/sources.json
 ```
 
-If Google Docs returns 401 or 403, make the doc public/published or configure `auth: "gcloud"`, `token_env`, or `token_command`.
+If Google Docs returns 401 or 403, make the doc public/published for read-only mode, or configure `auth: "gcloud"`, `token_env`, or `token_command` with Docs read/write scope for write-back.
+
+If Notion returns 401, 403, or 404, confirm `NOTION_TOKEN` is set and the page has been shared with the integration.
 
 If `github_issues` fails, run `gh auth status` and confirm the repo name and label.
 
