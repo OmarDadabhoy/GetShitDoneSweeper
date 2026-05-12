@@ -34,13 +34,13 @@ pnpm run sweep -- --source-url 'https://www.notion.so/...' --mode dry-run --max-
 Execute:
 
 ```bash
-GSD_ALLOW_EXECUTE=1 pnpm run sweep -- --mode execute --max-workers 2 --workspace /path/to/workspace
+GSD_ALLOW_EXECUTE=1 pnpm run sweep -- --source-url 'https://www.notion.so/...' --mode execute --max-workers 2 --workspace /path/to/workspace
 ```
 
 Watch every 20-30 minutes:
 
 ```bash
-GSD_ALLOW_EXECUTE=1 pnpm run watch -- --interval 1800 --jitter 600 --mode execute --max-workers 2
+GSD_ALLOW_EXECUTE=1 pnpm run watch -- --source-url 'https://www.notion.so/...' --interval 1800 --jitter 600 --mode execute --max-workers 2
 ```
 
 ## Sources
@@ -52,6 +52,8 @@ Quick link mode:
 ```bash
 pnpm run sweep -- --source-url 'YOUR_NOTION_OR_GOOGLE_DOC_LINK' --mode dry-run
 ```
+
+This uses the current Codex/Claude runtime's existing access. For direct wrapper-managed writes, use permanent config.
 
 Permanent config:
 
