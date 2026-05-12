@@ -1,55 +1,45 @@
 # Get Shit Done Sweeper
 
-Clawsweeper-style task runner for personal todo sources. It reads tasks from Google Docs, Notion, local files, or GitHub issues, creates one job per task, and fans jobs out to Codex workers.
+A ClawSweeper-style orchestrator for personal todos. It reads tasks, claims each one, runs Codex/Claude workers in parallel, marks tasks done or blocked, emails you, then keeps checking on a schedule.
 
-Use this when you want the automated multi-worker version. Use `Get-Shit-Done` when you just want the single-agent skill.
+Use this for the multi-worker version. Use `Get-Shit-Done` for the lighter slash-command skill.
 
 ## Install
 
 ```bash
 git clone git@github.com:OmarDadabhoy/GetShitDoneSweeper.git
 cd GetShitDoneSweeper
-node --version   # needs Node 20+
+corepack enable
+pnpm install --frozen-lockfile
 cp config/sources.example.json config/sources.json
 cp config/notifications.example.json config/notifications.json
 ```
 
-No install step is required right now; there are no runtime dependencies.
-
-## Use Existing Tools First
-
-Codex/Claude tools are available to the agent runtime, not necessarily to the Node intake script. That means:
-
-- Workers should use existing MCP servers, app connectors, installed skills, browser tools, and authenticated CLIs before asking for duplicate credentials.
-- This covers Notion, Google Drive/Docs, Sheets, Gmail, GitHub, and anything else the worker runtime already exposes.
-- The sweeper intake still needs `config/sources.json` unless you provide a custom agent-powered source later.
-- You do not need to duplicate credentials for actions the worker can do through its own runtime tools.
-
 ## Run
 
-Dry-run first:
+Dry run:
 
 ```bash
-npm run sweep -- --mode dry-run --max-workers 2
+pnpm run sweep -- --mode dry-run --max-workers 2
 ```
 
-That reads sources, creates jobs, and writes prompts under `state/runs` without invoking Codex.
-
-Execute with Codex:
+Execute:
 
 ```bash
-GSD_ALLOW_EXECUTE=1 npm run sweep -- --mode execute --max-workers 2 --workspace /path/to/workspace
+GSD_ALLOW_EXECUTE=1 pnpm run sweep -- --mode execute --max-workers 2 --workspace /path/to/workspace
 ```
 
-Poll every 20-30 minutes:
+Watch every 20-30 minutes:
 
 ```bash
-npm run watch -- --interval 1800 --jitter 600 --mode dry-run
+GSD_ALLOW_EXECUTE=1 pnpm run watch -- --interval 1800 --jitter 600 --mode execute --max-workers 2
 ```
 
-## Connect Google Docs
+## Sources
 
-Edit `config/sources.json`:
+Edit `config/sources.json`.
+
+Google Docs:
 
 ```json
 {
@@ -62,23 +52,7 @@ Edit `config/sources.json`:
 }
 ```
 
-Write-back options:
-
-- `mark_done`: `[ ]` becomes `[x]`, `TODO` becomes `DONE`
-- `delete`: clears the task paragraph
-- `none`: read only
-
-For private docs, authenticate with `gcloud`, `token_env`, or `token_command`.
-
-## Connect Notion
-
-Create a Notion integration, share the page with it, then:
-
-```bash
-export NOTION_TOKEN='secret_...'
-```
-
-Edit `config/sources.json`:
+Notion:
 
 ```json
 {
@@ -91,60 +65,27 @@ Edit `config/sources.json`:
 }
 ```
 
-Notion supports unchecked `to_do` blocks, `- [ ] Task`, and `TODO: Task`.
-
-When a worker starts, Google Docs/Notion tasks are marked in-progress so other agents skip them. Completion changes them to done; blocked work is marked blocked.
-
-## Other Sources
-
-Local file:
-
-```json
-{
-  "id": "local-todo",
-  "type": "text_file",
-  "enabled": true,
-  "path": "../todo.md"
-}
-```
-
-GitHub issues:
-
-```json
-{
-  "id": "github-issues",
-  "type": "github_issues",
-  "enabled": true,
-  "repo": "owner/repo",
-  "label": "get-shit-done"
-}
-```
-
-## Email Me
-
-Edit `config/notifications.json` and set `enabled` to `true`.
-
-```json
-{
-  "enabled": true,
-  "method": "command",
-  "to": ["you@example.com"],
-  "command": "mail -s {subject} {to} < {body_file}"
-}
-```
-
-Workers email on completion and when they need human input. SMTP is also supported.
-
-## Goal Mode
-
-Every job becomes an active goal. Codex workers are prompted to call `create_goal`; other agents use `state/current_goal.md`. Finished goals append to `state/goal_history.jsonl`.
-
-## Verify
+For email, put your address in `config/notifications.json` or set:
 
 ```bash
-npm test
-node --check src/cli.js
-node src/cli.js sources --config config/sources.json
+export GSD_EMAIL_TO='you@example.com'
+```
+
+## Guarantees
+
+- Uses your local environment first: `AGENTS.md`, `CLAUDE.md`, installed skills, MCP/app connectors, and authenticated CLIs.
+- Uses one overarching drain goal plus one goal per worker job.
+- Claims source items in-progress before workers run.
+- Refuses to mark tasks done or blocked unless they are already in-progress.
+- Marks completed work in the source and emails after every completed task when an email recipient is available.
+- Skips tasks already in-progress, done, or blocked so multiple agents do not intentionally collide.
+
+Google Docs claims use revision checks. Notion and local files re-check the current marker before each transition.
+
+## Check
+
+```bash
+pnpm run check
 ```
 
 Real config files are gitignored. Commit only `config/*.example.json`.

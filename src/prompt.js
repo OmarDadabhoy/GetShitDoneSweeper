@@ -5,6 +5,7 @@ export function renderWorkerPrompt({ root, job, mode, workspace }) {
   const systemPath = path.join(root, "prompts", "worker-system.md");
   const system = fs.readFileSync(systemPath, "utf8").trim();
   const currentGoalPath = path.join(root, "state", "current_goal.md");
+  const overarchingGoalPath = path.join(root, "state", "overarching_goal.md");
 
   return `${system}
 
@@ -26,6 +27,7 @@ ${JSON.stringify(job, null, 2)}
 
 Before doing any task work, activate goal mode for this job:
 
+- Treat ${overarchingGoalPath} as the parent drain goal.
 - In Codex, call create_goal with the task title as the concrete objective when goal tools are available.
 - In Claude Code or other agents, use the already-written fallback goal file at ${currentGoalPath}.
 
@@ -33,6 +35,8 @@ After the task is complete or blocked, clearly state done, blocked, or needs_hum
 
 ## Execution Notes
 
+- First load the local operating context that applies to ${workspace}: AGENTS.md, CLAUDE.md, SKILL.md, user-level agent instructions, installed skills, MCP/app connectors, and authenticated CLIs.
+- Prefer the user's existing tools and skills over duplicate credentials or local source config.
 - If this task is about code, inspect the workspace before editing.
 - If this task is about GitHub, use the provided source ref and local/CLI context available to you.
 - If this task came from Google Docs, Notion, Sheets, Gmail, GitHub, or another connected system, use existing runtime capabilities when available: MCP servers, app connectors, installed skills, first-party tools, browser tools, or authenticated CLIs.

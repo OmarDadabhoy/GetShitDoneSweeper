@@ -130,6 +130,8 @@ async function main() {
     writeJson(resultPath, result);
   } catch (error) {
     result.notification = { status: "failed", error: error.message };
+    result.status = "blocked";
+    result.summary = `task completed but notification failed: ${error.message}`;
     writeJson(resultPath, result);
   }
   const nextState = result.status === "done" ? "done" : "blocked";

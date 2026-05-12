@@ -176,6 +176,7 @@ function googleDocParagraphTasks(source, document) {
         type: "google_docs",
         mode: source.writeback ?? "mark_done",
         document_id: documentId,
+        revision_id: document.revisionId,
         auth: source.auth,
         token_env: source.token_env,
         token_command: source.token_command,
@@ -184,6 +185,7 @@ function googleDocParagraphTasks(source, document) {
         marker_start: markerStart,
         marker_end: markerEnd,
         kind: parsed.kind,
+        status: parsed.status,
       },
     });
   }
@@ -312,6 +314,7 @@ function notionBlockTasks(source, blocks) {
             token_env: source.token_env,
             token_command: source.token_command,
             notion_version: source.notion_version,
+            status: "todo",
           },
         });
       }
@@ -340,6 +343,7 @@ function notionBlockTasks(source, blocks) {
         block_type: block.type,
         kind: parsed.kind,
         text: line,
+        status: parsed.status,
         token_env: source.token_env,
         token_command: source.token_command,
         notion_version: source.notion_version,

@@ -17,6 +17,29 @@ export function activateGoal(root, job) {
   return goal;
 }
 
+export function activateDrainGoal(root) {
+  const goal = {
+    status: "active",
+    task: "Clear all actionable tasks from the configured todo sources",
+    started_at: new Date().toISOString(),
+  };
+  writeNamedGoal(root, "overarching_goal", goal);
+  return goal;
+}
+
+export function closeDrainGoal(root, status, details = {}) {
+  const goal = readNamedGoal(root, "overarching_goal") ?? {};
+  const closed = {
+    ...goal,
+    ...details,
+    status,
+    finished_at: new Date().toISOString(),
+  };
+  writeNamedGoal(root, "overarching_goal", closed);
+  appendGoalHistory(root, { ...closed, goal_type: "overarching" });
+  return closed;
+}
+
 export function closeGoal(root, status, details = {}) {
   const goal = readGoal(root) ?? {};
   const closed = {
@@ -38,8 +61,22 @@ function currentGoalMarkdownPath(root) {
   return path.join(root, "state", "current_goal.md");
 }
 
+function namedGoalPath(root, name) {
+  return path.join(root, "state", `${name}.json`);
+}
+
+function namedGoalMarkdownPath(root, name) {
+  return path.join(root, "state", `${name}.md`);
+}
+
 function readGoal(root) {
   const file = currentGoalPath(root);
+  if (!fs.existsSync(file)) return null;
+  return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function readNamedGoal(root, name) {
+  const file = namedGoalPath(root, name);
   if (!fs.existsSync(file)) return null;
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
@@ -58,6 +95,26 @@ function writeGoal(root, goal) {
       `Source: ${goal.source_id ?? ""}`,
       `Job: ${goal.job_id ?? ""}`,
       `Started: ${goal.started_at ?? ""}`,
+      "",
+    ].join("\n"),
+  );
+}
+
+function writeNamedGoal(root, name, goal) {
+  const stateDir = path.join(root, "state");
+  ensureDir(stateDir);
+  writeJson(namedGoalPath(root, name), goal);
+  fs.writeFileSync(
+    namedGoalMarkdownPath(root, name),
+    [
+      name === "overarching_goal" ? "# Overarching Goal" : "# Goal",
+      "",
+      `Status: ${goal.status ?? ""}`,
+      `Task: ${goal.task ?? ""}`,
+      `Started: ${goal.started_at ?? ""}`,
+      `Updated: ${goal.finished_at ?? goal.started_at ?? ""}`,
+      "",
+      goal.summary ?? "",
       "",
     ].join("\n"),
   );

@@ -5,6 +5,7 @@ import { repoRoot } from "./fs-utils.js";
 import { intake } from "./intake.js";
 import { dispatch } from "./dispatch.js";
 import { collectTasks } from "./sources.js";
+import { activateDrainGoal, closeDrainGoal } from "./goals.js";
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -55,9 +56,7 @@ async function main() {
   }
 
   if (command === "sweep") {
-    const intakeResult = await intake({ root, config });
-    const dispatchResult = await dispatch({ root, maxWorkers, mode, workspace, model, agentCommand });
-    console.log(JSON.stringify({ intake: intakeResult, dispatch: dispatchResult }, null, 2));
+    console.log(JSON.stringify(await drain({ root, config, maxWorkers, mode, workspace, model, agentCommand }), null, 2));
     return;
   }
 
@@ -65,9 +64,7 @@ async function main() {
     const interval = Number(args.interval ?? 1800);
     const jitter = Number(args.jitter ?? 600);
     while (true) {
-      const intakeResult = await intake({ root, config });
-      const dispatchResult = await dispatch({ root, maxWorkers, mode, workspace, model, agentCommand });
-      console.log(JSON.stringify({ intake: intakeResult, dispatch: dispatchResult }, null, 2));
+      console.log(JSON.stringify(await drain({ root, config, maxWorkers, mode, workspace, model, agentCommand }), null, 2));
       const wait = interval + (jitter > 0 ? Math.floor(Math.random() * jitter) : 0);
       console.log(`sleeping ${wait}s`);
       await sleep(wait * 1000);
@@ -75,6 +72,30 @@ async function main() {
   }
 
   throw new Error("usage: node src/cli.js sources|intake|dispatch|sweep|watch [options]");
+}
+
+async function drain({ root, config, maxWorkers, mode, workspace, model, agentCommand }) {
+  activateDrainGoal(root);
+  const cycles = [];
+  while (true) {
+    const intakeResult = await intake({ root, config });
+    const dispatchResult = await dispatch({ root, maxWorkers, mode, workspace, model, agentCommand });
+    cycles.push({ intake: intakeResult, dispatch: dispatchResult });
+
+    if (intakeResult.jobs_created === 0 && dispatchResult.jobs_seen === 0) {
+      closeDrainGoal(root, "done", {
+        summary: `Drain finished after ${cycles.length} cycle(s); no queued jobs remain.`,
+      });
+      return { cycles, status: "done" };
+    }
+
+    if (mode === "dry-run") {
+      closeDrainGoal(root, "planned", {
+        summary: "Dry run stopped after rendering available worker prompts.",
+      });
+      return { cycles, status: "planned" };
+    }
+  }
 }
 
 main().catch((error) => {

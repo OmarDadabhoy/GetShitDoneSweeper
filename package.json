@@ -10,9 +10,11 @@
     "sweep": "node src/cli.js sweep",
     "watch": "node src/cli.js watch",
     "worker": "node src/worker.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "check": "pnpm run test && node --check src/cli.js && node --check src/prompt.js"
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "packageManager": "pnpm@10.2.0"
 }

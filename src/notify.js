@@ -9,10 +9,15 @@ export async function sendNotification({ root, event, task, body }) {
   const configPath = path.join(root, "config", "notifications.json");
   if (!fs.existsSync(configPath)) return { status: "disabled" };
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-  if (!config.enabled) return { status: "disabled" };
 
-  const to = Array.isArray(config.to) ? config.to.filter(Boolean) : [config.to].filter(Boolean);
-  if (to.length === 0) throw new Error("Notification config needs at least one recipient in 'to'.");
+  const configuredTo = Array.isArray(config.to) ? config.to : [config.to].filter(Boolean);
+  const envTo = ["GSD_EMAIL_TO", "TODO_SKILL_EMAIL_TO", "NOTIFY_EMAIL_TO", "USER_EMAIL", "EMAIL"].flatMap((name) =>
+    process.env[name] ? process.env[name].split(",") : [],
+  );
+  const to = [...configuredTo, ...envTo].map((value) => String(value ?? "").trim()).filter(Boolean);
+  const realTo = to.filter((value) => value.toLowerCase() !== "you@example.com");
+  if (!config.enabled && realTo.length === 0) return { status: "disabled" };
+  if (realTo.length === 0) throw new Error("Notification config needs at least one recipient in 'to'.");
 
   const subject = `${config.subject_prefix ?? "[Get Shit Done]"} ${
     event === "done" ? `Task completed: ${task}` : `Input needed: ${task}`
@@ -20,14 +25,15 @@ export async function sendNotification({ root, event, task, body }) {
   const message = [`Event: ${event}`, `Task: ${task}`, "", body || "(no details provided)", ""].join("\n");
 
   if ((config.method ?? "command") === "command") {
-    sendCommand(config, subject, message, to);
+    if (!config.command) config.command = "mail -s {subject} {to} < {body_file}";
+    sendCommand(config, subject, message, realTo);
   } else if (config.method === "smtp") {
-    await sendSmtp(config, subject, message, to);
+    await sendSmtp(config, subject, message, realTo);
   } else {
     throw new Error(`Unsupported notification method: ${config.method}`);
   }
 
-  return { status: "sent", event, to };
+  return { status: "sent", event, to: realTo };
 }
 
 function quote(value) {
