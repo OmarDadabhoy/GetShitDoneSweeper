@@ -2,7 +2,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { queuedJobFiles } from "./jobs.js";
 
-export async function dispatch({ root, maxWorkers = 2, mode = "dry-run", workspace = root, model, agentCommand }) {
+export async function dispatch({ root, maxWorkers = 2, mode = "dry-run", workspace = root, agent, model, agentCommand }) {
   const jobs = queuedJobFiles(root);
   const results = [];
   let cursor = 0;
@@ -15,7 +15,7 @@ export async function dispatch({ root, maxWorkers = 2, mode = "dry-run", workspa
         cursor += 1;
         active += 1;
 
-        runWorker({ root, jobFile, mode, workspace, model, agentCommand }).then((result) => {
+        runWorker({ root, jobFile, mode, workspace, agent, model, agentCommand }).then((result) => {
           results.push(result);
           active -= 1;
           launchNext();
@@ -35,7 +35,7 @@ export async function dispatch({ root, maxWorkers = 2, mode = "dry-run", workspa
   });
 }
 
-function runWorker({ root, jobFile, mode, workspace, model, agentCommand }) {
+function runWorker({ root, jobFile, mode, workspace, agent, model, agentCommand }) {
   return new Promise((resolve) => {
     const args = [
       path.join(root, "src", "worker.js"),
@@ -48,6 +48,7 @@ function runWorker({ root, jobFile, mode, workspace, model, agentCommand }) {
       workspace,
     ];
     if (model) args.push("--model", model);
+    if (agent) args.push("--agent", agent);
     if (agentCommand) args.push("--agent-command", agentCommand);
 
     const child = spawn(process.execPath, args, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });

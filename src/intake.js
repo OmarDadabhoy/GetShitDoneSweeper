@@ -1,8 +1,8 @@
 import { collectTasks } from "./sources.js";
 import { createQueuedJobs } from "./jobs.js";
 
-export async function intake({ root, config, sourceUrl, sourceAgentCommand }) {
-  const tasks = await collectTasks(config, { root, sourceUrl, sourceAgentCommand });
+export async function intake({ root, config, sourceUrl, sourceAgent, sourceAgentCommand }) {
+  const tasks = await collectTasks(config, { root, sourceUrl, sourceAgent, sourceAgentCommand });
   const created = createQueuedJobs(root, tasks);
   return {
     tasks_seen: tasks.length,

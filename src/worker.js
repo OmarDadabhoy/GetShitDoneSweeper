@@ -35,7 +35,8 @@ async function main() {
   const jobFile = args._[0];
   const mode = args.mode ?? "dry-run";
   const workspace = path.resolve(args.workspace ?? root);
-  const model = args.model ?? process.env.GSD_CODEX_MODEL ?? "gpt-5.5";
+  const agent = args.agent ?? process.env.GSD_AGENT ?? "codex";
+  const model = args.model ?? defaultModel(agent);
   const agentCommand = args["agent-command"] ?? process.env.GSD_AGENT_CMD ?? "";
 
   if (!jobFile) throw new Error("usage: node src/worker.js <job.json> [--mode dry-run|execute]");
@@ -97,7 +98,7 @@ async function main() {
     return;
   }
 
-  const result = await runAgent({ prompt, promptPath, runDir, resultPath, workspace, model, agentCommand });
+  const result = await runAgent({ prompt, promptPath, runDir, resultPath, workspace, agent, model, agentCommand });
   result.claim = claim;
   if (result.status === "done") {
     try {
@@ -149,7 +150,12 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-function runAgent({ prompt, promptPath, runDir, resultPath, workspace, model, agentCommand }) {
+function defaultModel(agent) {
+  if (agent === "claude") return process.env.GSD_CLAUDE_MODEL;
+  return process.env.GSD_CODEX_MODEL ?? "gpt-5.5";
+}
+
+function runAgent({ prompt, promptPath, runDir, resultPath, workspace, agent, model, agentCommand }) {
   if (agentCommand) {
     const command = agentCommand
       .replaceAll("{prompt_file}", promptPath)
@@ -158,13 +164,37 @@ function runAgent({ prompt, promptPath, runDir, resultPath, workspace, model, ag
     return spawnShell(command, "", runDir, resultPath);
   }
 
+  if (agent === "claude") {
+    const args = [
+      "-p",
+      "--permission-mode",
+      "bypassPermissions",
+      "--add-dir",
+      workspace,
+      "--output-format",
+      "text",
+    ];
+    if (model) args.push("--model", model);
+    args.push(prompt);
+    return spawnCommand("claude", args, "", runDir, resultPath);
+  }
+
+  if (agent !== "codex") {
+    const result = {
+      status: "blocked",
+      summary: `unsupported agent "${agent}"`,
+      verification: "use --agent codex, --agent claude, or --agent-command",
+      follow_up: "",
+    };
+    writeJson(resultPath, result);
+    return Promise.resolve(result);
+  }
+
   const outputLastMessage = path.join(runDir, "agent.final.md");
   const args = [
     "exec",
     "--cd",
     workspace,
-    "--model",
-    model,
     "--sandbox",
     "danger-full-access",
     "-c",
@@ -172,8 +202,9 @@ function runAgent({ prompt, promptPath, runDir, resultPath, workspace, model, ag
     "--output-last-message",
     outputLastMessage,
     "--json",
-    "-",
   ];
+  if (model) args.push("--model", model);
+  args.push("-");
   return spawnCommand("codex", args, prompt, runDir, resultPath);
 }
 

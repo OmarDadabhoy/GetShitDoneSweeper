@@ -31,17 +31,32 @@ pnpm run sweep -- --source-url 'https://www.notion.so/...' --mode dry-run --max-
 
 `--source-url` asks an agent to read the link using whatever Codex/Claude already has: MCP, app connectors, installed skills, browser tools, and authenticated CLIs. No separate Notion/Google token is required for that path if the agent runtime already has access.
 
+Choose Codex or Claude Code:
+
+```bash
+# Codex is the default
+pnpm run sweep -- --agent codex --source-url 'https://www.notion.so/...' --mode dry-run
+
+# Use Claude Code for source reading and worker jobs
+pnpm run sweep -- --agent claude --source-url 'https://www.notion.so/...' --mode dry-run
+
+# Optional: split source reading and worker execution
+pnpm run sweep -- --source-agent claude --agent codex --source-url 'https://www.notion.so/...' --mode dry-run
+```
+
 Execute:
 
 ```bash
-GSD_ALLOW_EXECUTE=1 pnpm run sweep -- --source-url 'https://www.notion.so/...' --mode execute --max-workers 2 --workspace /path/to/workspace
+GSD_ALLOW_EXECUTE=1 pnpm run sweep -- --agent claude --source-url 'https://www.notion.so/...' --mode execute --max-workers 2 --workspace /path/to/workspace
 ```
 
 Watch every 20-30 minutes:
 
 ```bash
-GSD_ALLOW_EXECUTE=1 pnpm run watch -- --source-url 'https://www.notion.so/...' --interval 1800 --jitter 600 --mode execute --max-workers 2
+GSD_ALLOW_EXECUTE=1 pnpm run watch -- --agent claude --source-url 'https://www.notion.so/...' --interval 1800 --jitter 600 --mode execute --max-workers 2
 ```
+
+Use `GSD_AGENT=codex` or `GSD_AGENT=claude` if you do not want to pass `--agent` each time. Use `GSD_SOURCE_AGENT` only when source reading should use a different runtime than the workers.
 
 ## Sources
 

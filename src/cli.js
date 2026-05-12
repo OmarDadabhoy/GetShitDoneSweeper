@@ -36,24 +36,26 @@ async function main() {
   const mode = args.mode ?? "dry-run";
   const maxWorkers = Number(args["max-workers"] ?? args.max_workers ?? 2);
   const workspace = path.resolve(args.workspace ?? root);
+  const agent = args.agent ?? process.env.GSD_AGENT ?? "codex";
   const model = args.model;
   const agentCommand = args["agent-command"] ?? process.env.GSD_AGENT_CMD;
   const sourceUrl = args["source-url"] ?? args.url;
+  const sourceAgent = args["source-agent"] ?? process.env.GSD_SOURCE_AGENT ?? agent;
   const sourceAgentCommand = args["source-agent-command"] ?? process.env.GSD_SOURCE_AGENT_CMD;
 
   if (command === "sources") {
-    console.log(JSON.stringify(await collectTasks(config, { root, sourceUrl, sourceAgentCommand }), null, 2));
+    console.log(JSON.stringify(await collectTasks(config, { root, sourceUrl, sourceAgent, sourceAgentCommand }), null, 2));
     return;
   }
 
   if (command === "intake") {
-    console.log(JSON.stringify(await intake({ root, config, sourceUrl, sourceAgentCommand }), null, 2));
+    console.log(JSON.stringify(await intake({ root, config, sourceUrl, sourceAgent, sourceAgentCommand }), null, 2));
     return;
   }
 
   if (command === "dispatch") {
     console.log(
-      JSON.stringify(await dispatch({ root, maxWorkers, mode, workspace, model, agentCommand }), null, 2),
+      JSON.stringify(await dispatch({ root, maxWorkers, mode, workspace, agent, model, agentCommand }), null, 2),
     );
     return;
   }
@@ -61,7 +63,19 @@ async function main() {
   if (command === "sweep") {
     console.log(
       JSON.stringify(
-        await drain({ root, config, sourceUrl, sourceAgentCommand, maxWorkers, mode, workspace, model, agentCommand }),
+        await drain({
+          root,
+          config,
+          sourceUrl,
+          sourceAgent,
+          sourceAgentCommand,
+          maxWorkers,
+          mode,
+          workspace,
+          agent,
+          model,
+          agentCommand,
+        }),
         null,
         2,
       ),
@@ -75,7 +89,19 @@ async function main() {
     while (true) {
       console.log(
         JSON.stringify(
-          await drain({ root, config, sourceUrl, sourceAgentCommand, maxWorkers, mode, workspace, model, agentCommand }),
+          await drain({
+            root,
+            config,
+            sourceUrl,
+            sourceAgent,
+            sourceAgentCommand,
+            maxWorkers,
+            mode,
+            workspace,
+            agent,
+            model,
+            agentCommand,
+          }),
           null,
           2,
         ),
@@ -89,12 +115,24 @@ async function main() {
   throw new Error("usage: node src/cli.js sources|intake|dispatch|sweep|watch [options]");
 }
 
-async function drain({ root, config, sourceUrl, sourceAgentCommand, maxWorkers, mode, workspace, model, agentCommand }) {
+async function drain({
+  root,
+  config,
+  sourceUrl,
+  sourceAgent,
+  sourceAgentCommand,
+  maxWorkers,
+  mode,
+  workspace,
+  agent,
+  model,
+  agentCommand,
+}) {
   activateDrainGoal(root);
   const cycles = [];
   while (true) {
-    const intakeResult = await intake({ root, config, sourceUrl, sourceAgentCommand });
-    const dispatchResult = await dispatch({ root, maxWorkers, mode, workspace, model, agentCommand });
+    const intakeResult = await intake({ root, config, sourceUrl, sourceAgent, sourceAgentCommand });
+    const dispatchResult = await dispatch({ root, maxWorkers, mode, workspace, agent, model, agentCommand });
     cycles.push({ intake: intakeResult, dispatch: dispatchResult });
 
     if (intakeResult.jobs_created === 0 && dispatchResult.jobs_seen === 0) {

@@ -17,6 +17,7 @@ export async function collectTasks(configPath, options = {}) {
       type: "agent_link",
       enabled: true,
       url: options.sourceUrl,
+      agent: options.sourceAgent,
       agent_command: options.sourceAgentCommand,
     });
   }
@@ -113,23 +114,47 @@ function runSourceAgent({ source, root, prompt }) {
       return `${result.stdout}\n${result.stderr}`;
     }
 
-    const outputFile = path.join(os.tmpdir(), `gsd-source-output-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
-    const result = spawnSync(
-      "codex",
-      [
-        "exec",
-        "--cd",
+    const agent = source.agent ?? process.env.GSD_SOURCE_AGENT ?? "codex";
+    if (agent === "claude") {
+      const args = [
+        "-p",
+        "--permission-mode",
+        "bypassPermissions",
+        "--add-dir",
         root,
-        "--sandbox",
-        "danger-full-access",
-        "-c",
-        'approval_policy="never"',
-        "--output-last-message",
-        outputFile,
-        "-",
-      ],
-      { cwd: root, input: prompt, encoding: "utf8" },
-    );
+        "--output-format",
+        "text",
+      ];
+      const model = process.env.GSD_CLAUDE_MODEL;
+      if (model) args.push("--model", model);
+      args.push(prompt);
+      const result = spawnSync("claude", args, { cwd: root, encoding: "utf8" });
+      if (result.status !== 0) {
+        throw new Error(result.stderr || result.stdout || `Claude source read failed for ${source.id}.`);
+      }
+      return result.stdout;
+    }
+
+    if (agent !== "codex") {
+      throw new Error(`Unsupported source agent "${agent}". Use "codex", "claude", or source_agent_command.`);
+    }
+
+    const outputFile = path.join(os.tmpdir(), `gsd-source-output-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+    const codexArgs = [
+      "exec",
+      "--cd",
+      root,
+      "--sandbox",
+      "danger-full-access",
+      "-c",
+      'approval_policy="never"',
+      "--output-last-message",
+      outputFile,
+    ];
+    const model = process.env.GSD_CODEX_MODEL;
+    if (model) codexArgs.push("--model", model);
+    codexArgs.push("-");
+    const result = spawnSync("codex", codexArgs, { cwd: root, input: prompt, encoding: "utf8" });
     const output = fs.existsSync(outputFile) ? fs.readFileSync(outputFile, "utf8") : "";
     fs.rmSync(outputFile, { force: true });
     if (result.status !== 0) {
