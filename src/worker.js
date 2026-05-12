@@ -8,6 +8,7 @@ import { renderWorkerPrompt } from "./prompt.js";
 import { markTaskStatus } from "./writeback.js";
 import { sendNotification } from "./notify.js";
 import { activateGoal, closeGoal } from "./goals.js";
+import { writeHandoffReport } from "./handoff-report.js";
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -82,6 +83,7 @@ async function main() {
       verification: "",
       follow_up: "check source write permissions",
     };
+    result.handoff_report = writeHandoffReport({ runDir, job: running.job, result });
     writeJson(resultPath, result);
     closeGoal(root, "needs_human", {
       summary: result.summary,
@@ -135,6 +137,8 @@ async function main() {
     result.summary = `task completed but notification failed: ${error.message}`;
     writeJson(resultPath, result);
   }
+  result.handoff_report = writeHandoffReport({ runDir, job: running.job, result });
+  writeJson(resultPath, result);
   const nextState = result.status === "done" ? "done" : "blocked";
   closeGoal(root, nextState === "done" ? "done" : "needs_human", {
     summary: result.summary ?? "",
@@ -205,14 +209,14 @@ function runAgent({ prompt, promptPath, runDir, resultPath, workspace, agent, mo
   ];
   if (model) args.push("--model", model);
   args.push("-");
-  return spawnCommand("codex", args, prompt, runDir, resultPath);
+  return spawnCommand("codex", args, prompt, runDir, resultPath, { finalMessagePath: outputLastMessage });
 }
 
 function spawnShell(command, input, cwd, resultPath) {
   return spawnCommand(process.env.SHELL ?? "/bin/sh", ["-lc", command], input, cwd, resultPath);
 }
 
-function spawnCommand(command, args, input, cwd, resultPath) {
+function spawnCommand(command, args, input, cwd, resultPath, options = {}) {
   return new Promise((resolve) => {
     const stdoutPath = path.join(cwd, "agent.stdout.log");
     const stderrPath = path.join(cwd, "agent.stderr.log");
@@ -237,18 +241,39 @@ function spawnCommand(command, args, input, cwd, resultPath) {
       fs.writeFileSync(stdoutPath, stdout);
       fs.writeFileSync(stderrPath, stderr);
       const status = code === 0 ? "done" : "blocked";
+      const agentOutput = usefulOutput(stdout, stderr, options.finalMessagePath);
       const result = {
         status,
         exit_code: code,
-        summary: status === "done" ? "agent completed" : "agent failed",
-        verification: status === "done" ? "agent process exited 0" : stderr || stdout,
-        follow_up: "",
+        summary: status === "done" ? firstLine(agentOutput, "agent completed") : "agent failed",
+        verification: agentOutput || (status === "done" ? "agent process exited 0" : stderr || stdout),
+        follow_up: extractFollowUp(agentOutput),
       };
       writeJson(resultPath, result);
       resolve(result);
     });
     child.stdin.end(input);
   });
+}
+
+function usefulOutput(stdout, stderr, finalMessagePath) {
+  const finalMessage =
+    finalMessagePath && fs.existsSync(finalMessagePath) ? fs.readFileSync(finalMessagePath, "utf8").trim() : "";
+  const combined = [finalMessage, stdout.trim(), stderr.trim()].filter(Boolean).join("\n\n").trim();
+  return combined.slice(-8000);
+}
+
+function firstLine(value, fallback) {
+  const line = String(value ?? "")
+    .split(/\r?\n/)
+    .map((entry) => entry.trim())
+    .find(Boolean);
+  return line ? line.slice(0, 240) : fallback;
+}
+
+function extractFollowUp(value) {
+  const match = /(?:needs_from_(?:user|omar)|follow_up)\s*:\s*(.+)/i.exec(String(value ?? ""));
+  return match ? match[1].trim().slice(0, 2000) : "";
 }
 
 main().catch((error) => {

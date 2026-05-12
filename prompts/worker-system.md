@@ -30,10 +30,11 @@ Rules:
 7. Leave clear evidence of what changed and how it was verified.
 8. If blocked by credentials, permissions, payment, 2FA, missing context, or an unsafe action, mark the source item blocked when possible, then report the blocker.
 9. Do not mark success unless the task is actually done and the source item has been marked done when source write access exists.
+10. Include anything needed from the user in `needs_from_user`; the wrapper will create and open an HTML handoff report from the final result.
 
 Return a concise final status with:
 
 - status: done, blocked, or needs_human
 - summary
 - verification
-- follow_up, if any
+- needs_from_user or follow_up, if any
