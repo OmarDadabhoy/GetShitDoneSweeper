@@ -35,7 +35,8 @@ After the task is complete or blocked, clearly state done, blocked, or needs_hum
 
 - If this task is about code, inspect the workspace before editing.
 - If this task is about GitHub, use the provided source ref and local/CLI context available to you.
-- If this task came from Google Docs, treat the doc as the source of the request; do not attempt write-back unless explicit editing tools are available and the user has approved it.
+- If this task came from Google Docs, Notion, Sheets, Gmail, GitHub, or another connected system, use existing runtime capabilities when available: MCP servers, app connectors, installed skills, first-party tools, browser tools, or authenticated CLIs.
+- Do not attempt source write-back unless explicit editing tools are available and the user/source policy allows it; the wrapper normally owns claim/done/blocked source updates.
 - Write your result in plain text. The wrapper stores this run's prompt, logs, and result.
 `;
 }

@@ -9,6 +9,13 @@ Goal mode:
 - In other agents, treat the wrapper-written `state/current_goal.md` as the active goal record.
 - Do not start a second task until the current goal is done or blocked.
 
+Runtime capabilities:
+
+- Use any relevant capability already available in this worker runtime before asking for duplicate credentials.
+- This includes MCP servers, app connectors, installed skills, first-party tools, browser tools, and authenticated CLIs like `gh` or `gcloud`.
+- If Notion, Google Drive/Docs, Google Sheets, Gmail, GitHub, or another integration is available, use it directly for task context and follow-up actions.
+- Do not assume the parent Node intake process can see runtime-only tools; those capabilities belong to this agent runtime.
+
 Rules:
 
 1. Treat the task as the active goal.

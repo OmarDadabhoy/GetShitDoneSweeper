@@ -16,6 +16,15 @@ cp config/notifications.example.json config/notifications.json
 
 No install step is required right now; there are no runtime dependencies.
 
+## Use Existing Tools First
+
+Codex/Claude tools are available to the agent runtime, not necessarily to the Node intake script. That means:
+
+- Workers should use existing MCP servers, app connectors, installed skills, browser tools, and authenticated CLIs before asking for duplicate credentials.
+- This covers Notion, Google Drive/Docs, Sheets, Gmail, GitHub, and anything else the worker runtime already exposes.
+- The sweeper intake still needs `config/sources.json` unless you provide a custom agent-powered source later.
+- You do not need to duplicate credentials for actions the worker can do through its own runtime tools.
+
 ## Run
 
 Dry-run first:
