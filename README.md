@@ -31,18 +31,38 @@ pnpm run sweep -- --source-url 'https://www.notion.so/...' --mode dry-run --max-
 
 `--source-url` asks an agent to read the link using whatever Codex/Claude already has: MCP, app connectors, installed skills, browser tools, and authenticated CLIs. No separate Notion/Google token is required for that path if the agent runtime already has access.
 
-Choose Codex or Claude Code:
+## Agent Runtime
+
+Codex is the default for source reading and worker execution.
 
 ```bash
-# Codex is the default
 pnpm run sweep -- --agent codex --source-url 'https://www.notion.so/...' --mode dry-run
-
-# Use Claude Code for source reading and worker jobs
-pnpm run sweep -- --agent claude --source-url 'https://www.notion.so/...' --mode dry-run
-
-# Optional: split source reading and worker execution
-pnpm run sweep -- --source-agent claude --agent codex --source-url 'https://www.notion.so/...' --mode dry-run
 ```
+
+Use Claude Code instead:
+
+```bash
+pnpm run sweep -- --agent claude --source-url 'https://www.notion.so/...' --mode dry-run
+```
+
+Split source reading from worker execution:
+
+```bash
+# Claude Code reads Notion/Google Docs; Codex executes worker jobs
+pnpm run sweep -- --source-agent claude --agent codex --source-url 'https://www.notion.so/...' --mode dry-run
+
+# Codex reads Notion/Google Docs; Claude Code executes worker jobs
+pnpm run sweep -- --source-agent codex --agent claude --source-url 'https://www.notion.so/...' --mode dry-run
+```
+
+Set defaults with env vars:
+
+```bash
+export GSD_AGENT=claude
+export GSD_SOURCE_AGENT=claude
+```
+
+Use `--agent-command` or `--source-agent-command` only when you need a custom runtime command.
 
 Execute:
 
@@ -55,8 +75,6 @@ Watch every 20-30 minutes:
 ```bash
 GSD_ALLOW_EXECUTE=1 pnpm run watch -- --agent claude --source-url 'https://www.notion.so/...' --interval 1800 --jitter 600 --mode execute --max-workers 2
 ```
-
-Use `GSD_AGENT=codex` or `GSD_AGENT=claude` if you do not want to pass `--agent` each time. Use `GSD_SOURCE_AGENT` only when source reading should use a different runtime than the workers.
 
 ## Sources
 
