@@ -293,7 +293,8 @@ function notionBlockTasks(source, blocks) {
 
     if (block.type === "to_do") {
       const title = notionPlainText(block.to_do?.rich_text).trim();
-      if (title && !block.to_do?.checked) {
+      const isClaimed = title.startsWith("[>] ") || title.startsWith("[!] ") || title.startsWith("[x] ");
+      if (title && !block.to_do?.checked && !isClaimed) {
         tasks.push({
           task_id: fingerprint([source.id, block.id, title]),
           source_id: source.id,

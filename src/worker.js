@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { repoRoot, readJson, writeJson } from "./fs-utils.js";
 import { makeRunDir, transitionJob } from "./jobs.js";
 import { renderWorkerPrompt } from "./prompt.js";
-import { markTaskDone } from "./writeback.js";
+import { markTaskStatus } from "./writeback.js";
 import { sendNotification } from "./notify.js";
 import { activateGoal, closeGoal } from "./goals.js";
 
@@ -71,10 +71,37 @@ async function main() {
     return;
   }
 
+  let claim;
+  try {
+    claim = await markTaskStatus(running.job.task, "in-progress");
+  } catch (error) {
+    const result = {
+      status: "blocked",
+      summary: `failed to claim source task: ${error.message}`,
+      verification: "",
+      follow_up: "check source write permissions",
+    };
+    writeJson(resultPath, result);
+    closeGoal(root, "needs_human", {
+      summary: result.summary,
+      verification: "",
+      run_dir: runDir,
+      job_id: running.job.job_id,
+    });
+    transitionJob(running.file, "blocked", {
+      last_run_dir: runDir,
+      last_result: result.status,
+      worker_finished_at: new Date().toISOString(),
+    });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
   const result = await runAgent({ prompt, promptPath, runDir, resultPath, workspace, model, agentCommand });
+  result.claim = claim;
   if (result.status === "done") {
     try {
-      result.writeback = await markTaskDone(running.job.task);
+      result.writeback = await markTaskStatus(running.job.task, "done");
       writeJson(resultPath, result);
     } catch (error) {
       result.status = "blocked";
@@ -82,6 +109,14 @@ async function main() {
         status: "failed",
         error: error.message,
       };
+      writeJson(resultPath, result);
+    }
+  } else {
+    try {
+      result.writeback = await markTaskStatus(running.job.task, "blocked");
+      writeJson(resultPath, result);
+    } catch (error) {
+      result.writeback = { status: "failed", error: error.message };
       writeJson(resultPath, result);
     }
   }
