@@ -7,6 +7,7 @@ import { makeRunDir, transitionJob } from "./jobs.js";
 import { renderWorkerPrompt } from "./prompt.js";
 import { markTaskDone } from "./writeback.js";
 import { sendNotification } from "./notify.js";
+import { activateGoal, closeGoal } from "./goals.js";
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -44,6 +45,7 @@ async function main() {
   }
 
   const running = transitionJob(jobFile, "running", { worker_started_at: new Date().toISOString() });
+  activateGoal(root, running.job);
   const runDir = makeRunDir(root, running.job);
   const prompt = renderWorkerPrompt({ root, job: running.job, mode, workspace });
   const promptPath = path.join(runDir, "prompt.md");
@@ -58,6 +60,12 @@ async function main() {
       job_id: running.job.job_id,
     };
     writeJson(resultPath, result);
+    closeGoal(root, "planned", {
+      summary: result.summary,
+      verification: "prompt rendered",
+      run_dir: runDir,
+      job_id: running.job.job_id,
+    });
     transitionJob(running.file, "queued", { last_run_dir: runDir, last_result: result.status });
     console.log(JSON.stringify(result, null, 2));
     return;
@@ -90,6 +98,12 @@ async function main() {
     writeJson(resultPath, result);
   }
   const nextState = result.status === "done" ? "done" : "blocked";
+  closeGoal(root, nextState === "done" ? "done" : "needs_human", {
+    summary: result.summary ?? "",
+    verification: result.verification ?? "",
+    run_dir: runDir,
+    job_id: running.job.job_id,
+  });
   transitionJob(running.file, nextState, {
     last_run_dir: runDir,
     last_result: result.status,

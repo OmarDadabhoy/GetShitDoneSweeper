@@ -218,10 +218,22 @@ Available placeholders:
 - `{run_dir}`: run output directory.
 - `{workspace}`: workspace passed to the worker.
 
+## Goal Mode
+
+Every worker task gets a goal lifecycle.
+
+- Before invoking an agent, the wrapper writes `state/current_goal.json` and `state/current_goal.md`.
+- The worker prompt tells Codex to call `create_goal` when native goal tools are available.
+- Claude Code and custom agents use the file-backed goal as the fallback.
+- After completion or block, the wrapper appends the closed goal to `state/goal_history.jsonl`.
+
 ## State
 
 ```text
 state/
+  current_goal.json
+  current_goal.md
+  goal_history.jsonl
   jobs/
     queued/
     running/
@@ -245,6 +257,7 @@ Generated jobs and runs are ignored by git. The `.gitkeep` files keep the direct
 - Workers ask before externally visible or destructive actions.
 - Private sources are opt-in through config.
 - Every run stores the exact prompt sent to the agent.
+- Every worker activates one goal before work starts and closes it after success or block.
 - Completion and needs-human notifications are opt-in through `config/notifications.json`.
 
 ## Email Notifications
@@ -301,6 +314,7 @@ npm test
 node --check src/cli.js
 node --check src/worker.js
 node --check src/sources.js
+node --check src/goals.js
 node src/cli.js sources --config config/sources.json
 ```
 

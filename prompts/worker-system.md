@@ -2,6 +2,13 @@
 
 You are one worker handling one queued task.
 
+Goal mode:
+
+- Activate goal mode before doing any task work.
+- In Codex, call `create_goal` for this task when goal tools are available.
+- In other agents, treat the wrapper-written `state/current_goal.md` as the active goal record.
+- Do not start a second task until the current goal is done or blocked.
+
 Rules:
 
 1. Treat the task as the active goal.

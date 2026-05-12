@@ -6,10 +6,11 @@ This project borrows the useful operational shape from Clawsweeper without becom
 
 1. Intake lane reads configured sources and creates stable jobs.
 2. Dispatch lane limits concurrency and starts workers.
-3. Worker lane renders scoped prompts and invokes one agent per job.
-4. Write-back lane marks completed source items when a source supports it.
-5. Notification lane sends done or needs-human email when configured.
-6. State lane preserves prompts, logs, results, and job transitions.
+3. Goal lane activates one current goal per worker task.
+4. Worker lane renders scoped prompts and invokes one agent per job.
+5. Write-back lane marks completed source items when a source supports it.
+6. Notification lane sends done or needs-human email when configured.
+7. State lane preserves prompts, logs, results, goals, and job transitions.
 
 ## Guardrails
 
@@ -18,6 +19,7 @@ This project borrows the useful operational shape from Clawsweeper without becom
 - Mutating execution requires `GSD_ALLOW_EXECUTE=1`.
 - Private sources are opt-in through config.
 - Every run stores the exact prompt that was sent to the agent.
+- Goal state is written before every worker prompt and closed after success or block.
 - Source write-back runs only after a worker reports success.
 - Email notification is opt-in and runs after success or blocker classification.
 
@@ -25,6 +27,9 @@ This project borrows the useful operational shape from Clawsweeper without becom
 
 ```text
 state/
+  current_goal.json
+  current_goal.md
+  goal_history.jsonl
   jobs/
     queued/
     running/

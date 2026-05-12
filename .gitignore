@@ -1,4 +1,7 @@
 .DS_Store
+state/current_goal.json
+state/current_goal.md
+state/goal_history.jsonl
 state/jobs/queued/*.json
 state/jobs/running/*.json
 state/jobs/done/*.json
