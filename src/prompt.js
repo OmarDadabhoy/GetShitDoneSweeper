@@ -29,9 +29,16 @@ Before doing any task work, activate goal mode for this job:
 
 - Treat ${overarchingGoalPath} as the parent drain goal.
 - In Codex, call create_goal with the task title as the concrete objective when goal tools are available.
-- In Claude Code or other agents, use the already-written fallback goal file at ${currentGoalPath}.
+- In Claude Code, use Claude Code native goal mode with the task title as the active objective.
+- In other agents, use the already-written fallback goal file at ${currentGoalPath}.
 
 After the task is complete or blocked, clearly state done, blocked, or needs_human with verification so the wrapper can close the goal.
+
+## Source Claiming
+
+- If \`job.task.writeback.type\` is \`agent_link\`, the wrapper can only delegate source updates. Use your runtime Notion/Google Docs/Sheets/MCP/app tools to mark the exact item in-progress before doing task work.
+- For \`agent_link\`, also mark the exact source item done or blocked before your final response. Use the writeback hints in the job JSON.
+- If you cannot update the source status, stop with status \`needs_human\`.
 
 ## Execution Notes
 

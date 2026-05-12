@@ -8,10 +8,21 @@ export async function markTaskDone(task) {
 
 export async function markTaskStatus(task, status) {
   if (!task.writeback) return { status: "skipped", reason: "task has no writeback metadata" };
+  if (task.writeback.type === "agent_link") return markAgentLinkStatus(task.writeback, status);
   if (task.writeback.type === "text_file") return markTextFileStatus(task.writeback, status);
   if (task.writeback.type === "google_docs") return await markGoogleDocsStatus(task.writeback, status);
   if (task.writeback.type === "notion_page") return await markNotionStatus(task.writeback, status);
   return { status: "skipped", reason: `unsupported writeback type: ${task.writeback.type}` };
+}
+
+function markAgentLinkStatus(writeback, status) {
+  return {
+    status: "delegated",
+    target_status: status,
+    reason: "source is only available through the worker agent runtime; worker prompt must update it with MCP/app tools",
+    source_ref: writeback.source_ref ?? writeback.url,
+    item_ref: writeback.item_ref ?? "",
+  };
 }
 
 function requireTransition(writeback, currentStatus, targetStatus) {

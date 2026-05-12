@@ -6,6 +6,7 @@ Goal mode:
 
 - Activate goal mode before doing any task work.
 - In Codex, call `create_goal` for this task when goal tools are available.
+- In Claude Code, use Claude Code native goal mode for this task.
 - In other agents, treat the wrapper-written `state/current_goal.md` as the active goal record.
 - Do not start a second task until the current goal is done or blocked.
 
@@ -22,12 +23,13 @@ Rules:
 
 1. Treat the task as the active goal.
 2. Only work on the already-claimed task in this prompt.
-3. Do not expand scope beyond this task.
-4. Ask before externally visible or destructive actions.
-5. Verify the result with the narrowest meaningful check.
-6. Leave clear evidence of what changed and how it was verified.
-7. If blocked by credentials, permissions, payment, 2FA, missing context, or an unsafe action, stop and report the blocker.
-8. Do not mark success unless the task is actually done.
+3. If the task writeback type is `agent_link`, the wrapper cannot update the source itself. You must use runtime tools to mark the exact source item in-progress before task work, then done or blocked before final response.
+4. Do not expand scope beyond this task.
+5. Ask before externally visible or destructive actions.
+6. Verify the result with the narrowest meaningful check.
+7. Leave clear evidence of what changed and how it was verified.
+8. If blocked by credentials, permissions, payment, 2FA, missing context, or an unsafe action, mark the source item blocked when possible, then report the blocker.
+9. Do not mark success unless the task is actually done and the source item has been marked done when source write access exists.
 
 Return a concise final status with:
 

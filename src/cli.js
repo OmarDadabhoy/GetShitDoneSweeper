@@ -11,6 +11,7 @@ function parseArgs(argv) {
   const args = { _: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (arg === "--") continue;
     if (!arg.startsWith("--")) {
       args._.push(arg);
       continue;
@@ -37,14 +38,16 @@ async function main() {
   const workspace = path.resolve(args.workspace ?? root);
   const model = args.model;
   const agentCommand = args["agent-command"] ?? process.env.GSD_AGENT_CMD;
+  const sourceUrl = args["source-url"] ?? args.url;
+  const sourceAgentCommand = args["source-agent-command"] ?? process.env.GSD_SOURCE_AGENT_CMD;
 
   if (command === "sources") {
-    console.log(JSON.stringify(await collectTasks(config), null, 2));
+    console.log(JSON.stringify(await collectTasks(config, { root, sourceUrl, sourceAgentCommand }), null, 2));
     return;
   }
 
   if (command === "intake") {
-    console.log(JSON.stringify(await intake({ root, config }), null, 2));
+    console.log(JSON.stringify(await intake({ root, config, sourceUrl, sourceAgentCommand }), null, 2));
     return;
   }
 
@@ -56,7 +59,13 @@ async function main() {
   }
 
   if (command === "sweep") {
-    console.log(JSON.stringify(await drain({ root, config, maxWorkers, mode, workspace, model, agentCommand }), null, 2));
+    console.log(
+      JSON.stringify(
+        await drain({ root, config, sourceUrl, sourceAgentCommand, maxWorkers, mode, workspace, model, agentCommand }),
+        null,
+        2,
+      ),
+    );
     return;
   }
 
@@ -64,7 +73,13 @@ async function main() {
     const interval = Number(args.interval ?? 1800);
     const jitter = Number(args.jitter ?? 600);
     while (true) {
-      console.log(JSON.stringify(await drain({ root, config, maxWorkers, mode, workspace, model, agentCommand }), null, 2));
+      console.log(
+        JSON.stringify(
+          await drain({ root, config, sourceUrl, sourceAgentCommand, maxWorkers, mode, workspace, model, agentCommand }),
+          null,
+          2,
+        ),
+      );
       const wait = interval + (jitter > 0 ? Math.floor(Math.random() * jitter) : 0);
       console.log(`sleeping ${wait}s`);
       await sleep(wait * 1000);
@@ -74,11 +89,11 @@ async function main() {
   throw new Error("usage: node src/cli.js sources|intake|dispatch|sweep|watch [options]");
 }
 
-async function drain({ root, config, maxWorkers, mode, workspace, model, agentCommand }) {
+async function drain({ root, config, sourceUrl, sourceAgentCommand, maxWorkers, mode, workspace, model, agentCommand }) {
   activateDrainGoal(root);
   const cycles = [];
   while (true) {
-    const intakeResult = await intake({ root, config });
+    const intakeResult = await intake({ root, config, sourceUrl, sourceAgentCommand });
     const dispatchResult = await dispatch({ root, maxWorkers, mode, workspace, model, agentCommand });
     cycles.push({ intake: intakeResult, dispatch: dispatchResult });
 

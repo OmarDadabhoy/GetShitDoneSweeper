@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { parseTodoText, parseTodoLine, fingerprint } from "./task-parser.js";
@@ -7,9 +8,18 @@ const googleDocIdRe = /\/document\/d\/([a-zA-Z0-9_-]+)/;
 const notionPageIdRe =
   /([a-fA-F0-9]{32}|[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})/;
 
-export async function collectTasks(configPath) {
+export async function collectTasks(configPath, options = {}) {
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
   const sources = Array.isArray(config.sources) ? config.sources : [];
+  if (options.sourceUrl) {
+    sources.push({
+      id: "agent-link",
+      type: "agent_link",
+      enabled: true,
+      url: options.sourceUrl,
+      agent_command: options.sourceAgentCommand,
+    });
+  }
   const tasks = [];
 
   for (const source of sources) {
@@ -24,12 +34,126 @@ export async function collectTasks(configPath) {
       tasks.push(...(await readNotionPageSource(source)));
     } else if (source.type === "github_issues") {
       tasks.push(...readGitHubIssuesSource(source));
+    } else if (source.type === "agent_link") {
+      tasks.push(...readAgentLinkSource(source, options.root ?? path.dirname(configPath)));
     } else {
       throw new Error(`Unsupported source type: ${source.type}`);
     }
   }
 
   return tasks;
+}
+
+function readAgentLinkSource(source, root) {
+  if (!source.url) throw new Error(`Agent link source ${source.id} needs url.`);
+  const prompt = renderAgentLinkPrompt(source);
+  const output = runSourceAgent({ source, root, prompt });
+  const items = extractJsonArray(output);
+  return items.map((entry, index) => {
+    const title = String(entry.title ?? "").trim();
+    if (!title) throw new Error(`Agent link source ${source.id} returned a task without title.`);
+    const itemRef = String(entry.source_item_ref ?? entry.item_ref ?? entry.location ?? `${index + 1}`);
+    const sourceRef = String(entry.source_ref ?? source.url);
+    return {
+      task_id: fingerprint([source.id, source.url, itemRef, title]),
+      source_id: source.id,
+      source_type: source.type,
+      title,
+      body: String(entry.body ?? ""),
+      location: String(entry.location ?? `${source.url}#${index + 1}`),
+      source_ref: sourceRef,
+      created_from: "agent_link",
+      writeback: {
+        type: "agent_link",
+        source_id: source.id,
+        url: source.url,
+        source_ref: sourceRef,
+        item_ref: itemRef,
+        claim_hint: entry.claim_hint ?? "",
+        done_hint: entry.done_hint ?? "",
+        blocked_hint: entry.blocked_hint ?? "",
+      },
+    };
+  });
+}
+
+function renderAgentLinkPrompt(source) {
+  return `Read this todo source using the tools already available in this agent runtime:
+
+${source.url}
+
+Use existing MCP servers, app connectors, installed skills, browser tools, and authenticated CLIs before asking for credentials.
+
+Return JSON only. Return an array of actionable incomplete tasks. Each item must have:
+- title
+- location
+- source_item_ref: a stable block/line/task reference if visible
+- claim_hint: how to mark this exact item in-progress
+- done_hint: how to mark this exact item done
+- blocked_hint: how to mark this exact item blocked
+
+Skip anything already marked in-progress, done, blocked, waiting, or not actionable.
+Use [] if there are no actionable tasks.`;
+}
+
+function runSourceAgent({ source, root, prompt }) {
+  const commandTemplate = source.agent_command ?? process.env.GSD_SOURCE_AGENT_CMD;
+  const promptFile = path.join(os.tmpdir(), `gsd-source-${Date.now()}-${Math.random().toString(16).slice(2)}.md`);
+  fs.writeFileSync(promptFile, prompt);
+  try {
+    if (commandTemplate) {
+      const command = commandTemplate
+        .replaceAll("{prompt_file}", promptFile)
+        .replaceAll("{url}", source.url)
+        .replaceAll("{source_id}", source.id);
+      const result = spawnSync(command, { cwd: root, shell: true, encoding: "utf8" });
+      if (result.status !== 0) {
+        throw new Error(result.stderr || result.stdout || `Source agent command failed for ${source.id}.`);
+      }
+      return `${result.stdout}\n${result.stderr}`;
+    }
+
+    const outputFile = path.join(os.tmpdir(), `gsd-source-output-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+    const result = spawnSync(
+      "codex",
+      [
+        "exec",
+        "--cd",
+        root,
+        "--sandbox",
+        "danger-full-access",
+        "-c",
+        'approval_policy="never"',
+        "--output-last-message",
+        outputFile,
+        "-",
+      ],
+      { cwd: root, input: prompt, encoding: "utf8" },
+    );
+    const output = fs.existsSync(outputFile) ? fs.readFileSync(outputFile, "utf8") : "";
+    fs.rmSync(outputFile, { force: true });
+    if (result.status !== 0) {
+      throw new Error(result.stderr || result.stdout || output || `Codex source read failed for ${source.id}.`);
+    }
+    return output || result.stdout;
+  } finally {
+    fs.rmSync(promptFile, { force: true });
+  }
+}
+
+function extractJsonArray(output) {
+  const text = String(output ?? "").trim();
+  try {
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) throw new Error("Source agent JSON must be an array.");
+    return parsed;
+  } catch {
+    const match = /\[[\s\S]*\]/.exec(text);
+    if (!match) throw new Error(`Source agent did not return a JSON array. Output: ${text.slice(0, 500)}`);
+    const parsed = JSON.parse(match[0]);
+    if (!Array.isArray(parsed)) throw new Error("Source agent JSON must be an array.");
+    return parsed;
+  }
 }
 
 function resolveConfigPath(configPath, value) {

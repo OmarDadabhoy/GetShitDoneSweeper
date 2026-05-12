@@ -23,6 +23,14 @@ Dry run:
 pnpm run sweep -- --mode dry-run --max-workers 2
 ```
 
+With a Notion or Google Docs link:
+
+```bash
+pnpm run sweep -- --source-url 'https://www.notion.so/...' --mode dry-run --max-workers 2
+```
+
+`--source-url` asks an agent to read the link using whatever Codex/Claude already has: MCP, app connectors, installed skills, browser tools, and authenticated CLIs. No separate Notion/Google token is required for that path if the agent runtime already has access.
+
 Execute:
 
 ```bash
@@ -38,6 +46,14 @@ GSD_ALLOW_EXECUTE=1 pnpm run watch -- --interval 1800 --jitter 600 --mode execut
 ## Sources
 
 Edit `config/sources.json`.
+
+Quick link mode:
+
+```bash
+pnpm run sweep -- --source-url 'YOUR_NOTION_OR_GOOGLE_DOC_LINK' --mode dry-run
+```
+
+Permanent config:
 
 Google Docs:
 
@@ -80,7 +96,7 @@ export GSD_EMAIL_TO='you@example.com'
 - Marks completed work in the source and emails after every completed task when an email recipient is available.
 - Skips tasks already in-progress, done, or blocked so multiple agents do not intentionally collide.
 
-Google Docs claims use revision checks. Notion and local files re-check the current marker before each transition.
+Google Docs claims use revision checks. Notion and local files re-check the current marker before each transition. For `--source-url`, the worker uses the agent runtime's Notion/Google tools to claim and complete the exact item because the Node wrapper cannot directly call runtime-only MCP/app tools.
 
 ## Check
 
