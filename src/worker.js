@@ -186,7 +186,8 @@ function runAgent({ prompt, promptPath, runDir, resultPath, workspace, agent, mo
     ];
     if (model) args.push("--model", model);
     args.push(prompt);
-    return spawnCommand("claude", args, "", runDir, resultPath);
+    const env = model ? { CLAUDE_CODE_SUBAGENT_MODEL: model } : {};
+    return spawnCommand("claude", args, "", runDir, resultPath, { env });
   }
 
   if (agent === "hermes") {
@@ -245,7 +246,11 @@ function spawnCommand(command, args, input, cwd, resultPath, options = {}) {
   return new Promise((resolve) => {
     const stdoutPath = path.join(cwd, "agent.stdout.log");
     const stderrPath = path.join(cwd, "agent.stderr.log");
-    const child = spawn(command, args, { cwd, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(command, args, {
+      cwd,
+      env: { ...process.env, ...(options.env ?? {}) },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
     let stdout = "";
     let stderr = "";
 
