@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { parseTodoText, parseTodoLine, fingerprint } from "./task-parser.js";
+import { hermesArgs, openClawArgs } from "./runtimes.js";
 
 const googleDocIdRe = /\/document\/d\/([a-zA-Z0-9_-]+)/;
 const notionPageIdRe =
@@ -135,8 +136,24 @@ function runSourceAgent({ source, root, prompt }) {
       return result.stdout;
     }
 
+    if (agent === "hermes") {
+      const result = spawnSync("hermes", hermesArgs(prompt), { cwd: root, encoding: "utf8" });
+      if (result.status !== 0) {
+        throw new Error(result.stderr || result.stdout || `Hermes source read failed for ${source.id}.`);
+      }
+      return result.stdout;
+    }
+
+    if (agent === "openclaw") {
+      const result = spawnSync("openclaw", openClawArgs(prompt), { cwd: root, encoding: "utf8" });
+      if (result.status !== 0) {
+        throw new Error(result.stderr || result.stdout || `OpenClaw source read failed for ${source.id}.`);
+      }
+      return result.stdout;
+    }
+
     if (agent !== "codex") {
-      throw new Error(`Unsupported source agent "${agent}". Use "codex", "claude", or source_agent_command.`);
+      throw new Error(`Unsupported source agent "${agent}". Use "codex", "claude", "hermes", "openclaw", or source_agent_command.`);
     }
 
     const outputFile = path.join(os.tmpdir(), `gsd-source-output-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);

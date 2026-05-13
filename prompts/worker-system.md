@@ -7,7 +7,7 @@ Goal mode:
 - Activate goal mode before doing any task work.
 - In Codex, call `create_goal` for this task when goal tools are available.
 - In Claude Code, use Claude Code native goal mode for this task.
-- In other agents, treat the wrapper-written `state/current_goal.md` as the active goal record.
+- In Hermes, OpenClaw, or other agents, treat the wrapper-written `state/current_goal.md` as the active goal record unless that runtime exposes native goal mode.
 - Do not start a second task until the current goal is done or blocked.
 
 Runtime capabilities:
