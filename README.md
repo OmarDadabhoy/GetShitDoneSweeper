@@ -58,6 +58,6 @@ export GSD_EMAIL_TO='you@example.com'
 
 ## Rules
 
-Uses a drain goal plus one goal per worker, claims items before work, marks them done or blocked, opens an HTML handoff report, emails on completion, and skips in-progress/done/blocked items.
+Uses a drain goal plus one goal per worker, claims items before work, appends useful suggestions under `Suggested Changes`, marks done or blocked, opens an HTML handoff report, emails on completion, and skips in-progress/done/blocked items.
 
 Real config files are gitignored. Commit only `config/*.example.json`.

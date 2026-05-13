@@ -458,6 +458,7 @@ function notionBlockTasks(source, blocks) {
           writeback: {
             type: "notion_page",
             mode: source.writeback ?? "mark_done",
+            page_id: pageId,
             block_id: block.id,
             block_type: block.type,
             token_env: source.token_env,
@@ -488,6 +489,7 @@ function notionBlockTasks(source, blocks) {
       writeback: {
         type: "notion_page",
         mode: source.writeback ?? "mark_done",
+        page_id: pageId,
         block_id: block.id,
         block_type: block.type,
         kind: parsed.kind,
