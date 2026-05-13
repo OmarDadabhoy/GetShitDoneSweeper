@@ -1,12 +1,14 @@
-# Get Shit Done Sweeper
+# AI Slaves Sweeper
 
-Multi-worker todo orchestrator for Codex or Claude Code. It reads tasks, claims them, runs worker agents, marks done or blocked, emails you, then keeps checking.
+Multi-worker orchestrator for AI Slaves — runs a swarm of Codex or Claude Code workers against a single todo source. Reads tasks, claims them, dispatches one worker per item, marks done or blocked, emails you, then keeps checking.
+
+Live at [ai-slaves.com](https://ai-slaves.com). For the single-worker slash-command skill, see [ai-slaves](https://github.com/OmarDadabhoy/ai-slaves).
 
 ## Install
 
 ```bash
-git clone git@github.com:OmarDadabhoy/GetShitDoneSweeper.git
-cd GetShitDoneSweeper
+git clone git@github.com:OmarDadabhoy/ai-slaves-sweeper.git
+cd ai-slaves-sweeper
 corepack enable
 pnpm install --frozen-lockfile
 cp config/sources.example.json config/sources.json
@@ -58,6 +60,10 @@ export GSD_EMAIL_TO='you@example.com'
 
 ## Rules
 
-Uses a drain goal plus one goal per worker, claims items before work, marks them done or blocked, opens an HTML handoff report, emails on completion, and skips in-progress/done/blocked items.
+Uses a drain goal plus one goal per worker, claims items before work, appends useful suggestions under `Suggested Changes`, marks done or blocked, opens an HTML handoff report, emails on completion, and skips in-progress/done/blocked items.
 
 Real config files are gitignored. Commit only `config/*.example.json`.
+
+## Naming
+
+GitHub repo renamed from `GetShitDoneSweeper` → `ai-slaves-sweeper` on 2026-05-13 to align with the `ai-slaves.com` brand. The legacy `GSD_*` env vars are kept as-is for backwards compatibility.

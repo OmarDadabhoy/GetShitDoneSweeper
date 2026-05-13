@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { repoRoot, readJson, writeJson } from "./fs-utils.js";
 import { makeRunDir, transitionJob } from "./jobs.js";
 import { renderWorkerPrompt } from "./prompt.js";
-import { markTaskStatus } from "./writeback.js";
+import { appendTaskSuggestions, markTaskStatus } from "./writeback.js";
 import { sendNotification } from "./notify.js";
 import { activateGoal, closeGoal } from "./goals.js";
 import { writeHandoffReport } from "./handoff-report.js";
@@ -102,6 +102,16 @@ async function main() {
 
   const result = await runAgent({ prompt, promptPath, runDir, resultPath, workspace, agent, model, agentCommand });
   result.claim = claim;
+  result.suggested_changes = extractSuggestions(result);
+  if (result.suggested_changes.length > 0) {
+    try {
+      result.suggestions_writeback = await appendTaskSuggestions(running.job.task, result.suggested_changes);
+      writeJson(resultPath, result);
+    } catch (error) {
+      result.suggestions_writeback = { status: "failed", error: error.message };
+      writeJson(resultPath, result);
+    }
+  }
   if (result.status === "done") {
     try {
       result.writeback = await markTaskStatus(running.job.task, "done");
@@ -274,6 +284,25 @@ function firstLine(value, fallback) {
 function extractFollowUp(value) {
   const match = /(?:needs_from_(?:user|omar)|follow_up)\s*:\s*(.+)/i.exec(String(value ?? ""));
   return match ? match[1].trim().slice(0, 2000) : "";
+}
+
+function extractSuggestions(result) {
+  if (Array.isArray(result.suggested_changes)) return result.suggested_changes.map(String).filter(Boolean);
+  const text = [result.summary, result.verification, result.follow_up].filter(Boolean).join("\n");
+  const match = /(?:suggested[_ ]changes|suggestions)\s*:?\s*([\s\S]*)/i.exec(text);
+  if (!match) return [];
+  const suggestions = [];
+  for (const line of match[1].split(/\r?\n/)) {
+    const stripped = line.trim();
+    if (!stripped) {
+      if (suggestions.length) break;
+      continue;
+    }
+    if (/^(status|summary|verification|needs_from_user|follow_up)\s*:/i.test(stripped)) break;
+    const cleaned = stripped.replace(/^[-*]\s+/, "").replace(/^\d+[.)]\s+/, "").trim();
+    if (cleaned && !["none", "n/a", "nothing"].includes(cleaned.toLowerCase())) suggestions.push(cleaned);
+  }
+  return suggestions;
 }
 
 main().catch((error) => {

@@ -31,6 +31,7 @@ Rules:
 8. If blocked by credentials, permissions, payment, 2FA, missing context, or an unsafe action, mark the source item blocked when possible, then report the blocker.
 9. Do not mark success unless the task is actually done and the source item has been marked done when source write access exists.
 10. Include anything needed from the user in `needs_from_user`; the wrapper will create and open an HTML handoff report from the final result.
+11. If useful improvements occur to you while working, include them in `suggested_changes`. For `agent_link` sources, append those suggestions to the source under `Suggested Changes` using runtime tools before final response.
 
 Return a concise final status with:
 
@@ -38,3 +39,4 @@ Return a concise final status with:
 - summary
 - verification
 - needs_from_user or follow_up, if any
+- suggested_changes, if any

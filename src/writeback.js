@@ -15,6 +15,23 @@ export async function markTaskStatus(task, status) {
   return { status: "skipped", reason: `unsupported writeback type: ${task.writeback.type}` };
 }
 
+export async function appendTaskSuggestions(task, suggestions) {
+  const cleaned = (suggestions ?? []).map((value) => String(value).trim()).filter(Boolean);
+  if (cleaned.length === 0) return { status: "skipped", reason: "no suggestions" };
+  if (!task.writeback) return { status: "skipped", reason: "task has no writeback metadata" };
+  if (task.writeback.type === "agent_link") {
+    return {
+      status: "delegated",
+      reason: "source is only available through the worker agent runtime; worker prompt must append suggestions",
+      count: cleaned.length,
+    };
+  }
+  if (task.writeback.type === "text_file") return appendTextFileSuggestions(task, cleaned);
+  if (task.writeback.type === "google_docs") return await appendGoogleDocsSuggestions(task, cleaned);
+  if (task.writeback.type === "notion_page") return await appendNotionSuggestions(task, cleaned);
+  return { status: "skipped", reason: `unsupported writeback type: ${task.writeback.type}` };
+}
+
 function markAgentLinkStatus(writeback, status) {
   return {
     status: "delegated",
@@ -23,6 +40,22 @@ function markAgentLinkStatus(writeback, status) {
     source_ref: writeback.source_ref ?? writeback.url,
     item_ref: writeback.item_ref ?? "",
   };
+}
+
+function suggestionText(task, suggestions) {
+  const stamp = new Date().toISOString().slice(0, 10);
+  return [`- ${stamp} - ${task.title}`, ...suggestions.map((suggestion) => `  - ${suggestion}`)].join("\n");
+}
+
+function appendTextFileSuggestions(task, suggestions) {
+  const file = task.writeback.path;
+  const current = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  const parts = [];
+  if (!current.toLowerCase().includes("suggested changes")) parts.push("", "## Suggested Changes", "");
+  parts.push(suggestionText(task, suggestions));
+  const separator = current.endsWith("\n") ? "" : "\n";
+  fs.writeFileSync(file, `${current}${separator}${parts.join("\n").replace(/^\n+/, "")}\n`);
+  return { status: "appended", type: "text_file", path: file, count: suggestions.length };
 }
 
 function requireTransition(writeback, currentStatus, targetStatus) {
@@ -103,6 +136,47 @@ async function markGoogleDocsStatus(writeback, status) {
   }
 
   return { status, mode: status === "done" ? (writeback.mode ?? "mark_done") : "mark_status" };
+}
+
+async function appendGoogleDocsSuggestions(task, suggestions) {
+  const writeback = task.writeback;
+  const token = googleBearerToken(writeback);
+  if (!token) {
+    throw new Error("Google Docs suggestion writeback requires auth, token_env, or token_command.");
+  }
+  const response = await fetch(`https://docs.googleapis.com/v1/documents/${writeback.document_id}`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401 || response.status === 403) {
+    throw new Error("Google Docs suggestion writeback was not authorized.");
+  }
+  if (!response.ok) throw new Error(`Google Docs suggestion writeback failed during read: HTTP ${response.status}`);
+  const document = await response.json();
+  const body = document.body?.content ?? [];
+  const fullText = body.map((element) => (element.paragraph ? paragraphText(element.paragraph) : "")).join("\n");
+  const endIndex = Math.max(1, ...body.map((element) => Number(element.endIndex) || 1));
+  const insertIndex = Math.max(1, endIndex - 1);
+  const parts = [];
+  if (!fullText.toLowerCase().includes("suggested changes")) parts.push("", "Suggested Changes", "");
+  parts.push(suggestionText(task, suggestions));
+  const writeResponse = await fetch(
+    `https://docs.googleapis.com/v1/documents/${writeback.document_id}:batchUpdate`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        requests: [{ insertText: { location: { index: insertIndex }, text: `${parts.join("\n").replace(/^\n+/, "")}\n` } }],
+        writeControl: document.revisionId ? { requiredRevisionId: document.revisionId } : undefined,
+      }),
+    },
+  );
+  if (!writeResponse.ok) {
+    throw new Error(`Google Docs suggestion writeback failed: HTTP ${writeResponse.status} ${await writeResponse.text()}`);
+  }
+  return { status: "appended", type: "google_docs", document_id: writeback.document_id, count: suggestions.length };
 }
 
 async function googleDocsCurrentStatus(writeback, token) {
@@ -252,6 +326,43 @@ async function markNotionStatus(writeback, status) {
   }
 
   throw new Error(`Unsupported Notion block type for writeback: ${block.type}`);
+}
+
+async function appendNotionSuggestions(task, suggestions) {
+  const writeback = task.writeback;
+  const pageId = writeback.page_id;
+  if (!pageId) return { status: "skipped", reason: "notion writeback has no page_id" };
+  const token = notionToken(writeback);
+  const children = await notionJson(
+    "GET",
+    `https://api.notion.com/v1/blocks/${pageId}/children?page_size=100`,
+    token,
+    writeback,
+  );
+  const hasHeading = (children.results ?? []).some((block) => {
+    if (!["heading_1", "heading_2", "heading_3"].includes(block.type)) return false;
+    return notionPlainText(block[block.type]?.rich_text).toLowerCase().includes("suggested changes");
+  });
+  const blocks = [];
+  if (!hasHeading) {
+    blocks.push({ object: "block", type: "heading_2", heading_2: { rich_text: notionRichText("Suggested Changes") } });
+  }
+  blocks.push({
+    object: "block",
+    type: "bulleted_list_item",
+    bulleted_list_item: { rich_text: notionRichText(suggestionText(task, [])) },
+  });
+  blocks.push(
+    ...suggestions.map((suggestion) => ({
+      object: "block",
+      type: "bulleted_list_item",
+      bulleted_list_item: { rich_text: notionRichText(`- ${suggestion}`) },
+    })),
+  );
+  await notionJson("PATCH", `https://api.notion.com/v1/blocks/${pageId}/children`, token, writeback, {
+    children: blocks,
+  });
+  return { status: "appended", type: "notion_page", page_id: pageId, count: suggestions.length };
 }
 
 function notionPlainText(richText) {
