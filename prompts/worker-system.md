@@ -10,6 +10,14 @@ Goal mode:
 - In Hermes, OpenClaw, or other agents, treat the wrapper-written `state/current_goal.md` as the active goal record unless that runtime exposes native goal mode.
 - Do not start a second task until the current goal is done or blocked.
 
+Model selection:
+
+- Run this worker/sub-agent on the best available model unless the user explicitly requested another model, cheaper mode, faster mode, or runtime default.
+- Codex workers default to `gpt-5.5` when a model flag is available.
+- Claude Code workers default to the `opus` model alias when a model flag is available.
+- Hermes workers default to `opus` when a model flag is available.
+- OpenClaw workers use the configured best OpenClaw model and default to `xhigh` thinking because the CLI exposes thinking level rather than a per-turn model flag.
+
 Runtime capabilities:
 
 - Use any relevant capability already available in this worker runtime before asking for duplicate credentials.

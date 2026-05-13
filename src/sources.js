@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { parseTodoText, parseTodoLine, fingerprint } from "./task-parser.js";
-import { hermesArgs, openClawArgs } from "./runtimes.js";
+import { defaultModel, hermesArgs, openClawArgs } from "./runtimes.js";
 
 const googleDocIdRe = /\/document\/d\/([a-zA-Z0-9_-]+)/;
 const notionPageIdRe =
@@ -126,7 +126,7 @@ function runSourceAgent({ source, root, prompt }) {
         "--output-format",
         "text",
       ];
-      const model = process.env.GSD_CLAUDE_MODEL;
+      const model = defaultModel("claude");
       if (model) args.push("--model", model);
       args.push(prompt);
       const result = spawnSync("claude", args, { cwd: root, encoding: "utf8" });
@@ -137,7 +137,7 @@ function runSourceAgent({ source, root, prompt }) {
     }
 
     if (agent === "hermes") {
-      const result = spawnSync("hermes", hermesArgs(prompt), { cwd: root, encoding: "utf8" });
+      const result = spawnSync("hermes", hermesArgs(prompt, defaultModel("hermes")), { cwd: root, encoding: "utf8" });
       if (result.status !== 0) {
         throw new Error(result.stderr || result.stdout || `Hermes source read failed for ${source.id}.`);
       }
@@ -168,7 +168,7 @@ function runSourceAgent({ source, root, prompt }) {
       "--output-last-message",
       outputFile,
     ];
-    const model = process.env.GSD_CODEX_MODEL;
+    const model = defaultModel("codex");
     if (model) codexArgs.push("--model", model);
     codexArgs.push("-");
     const result = spawnSync("codex", codexArgs, { cwd: root, input: prompt, encoding: "utf8" });

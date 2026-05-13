@@ -1,7 +1,14 @@
+const BEST_MODEL_BY_AGENT = {
+  codex: "gpt-5.5",
+  claude: "opus",
+  hermes: "opus",
+};
+
 export function defaultModel(agent) {
-  if (agent === "claude") return process.env.GSD_CLAUDE_MODEL;
-  if (agent === "hermes") return process.env.GSD_HERMES_MODEL;
-  return process.env.GSD_CODEX_MODEL ?? "gpt-5.5";
+  if (agent === "claude") return process.env.GSD_CLAUDE_MODEL ?? BEST_MODEL_BY_AGENT.claude;
+  if (agent === "hermes") return process.env.GSD_HERMES_MODEL ?? BEST_MODEL_BY_AGENT.hermes;
+  if (agent === "openclaw") return undefined;
+  return process.env.GSD_CODEX_MODEL ?? BEST_MODEL_BY_AGENT.codex;
 }
 
 export function hermesArgs(prompt, model = process.env.GSD_HERMES_MODEL) {
@@ -21,7 +28,7 @@ export function openClawArgs(prompt) {
   const target = process.env.GSD_OPENCLAW_TO ?? process.env.OPENCLAW_TO;
   const sessionId = process.env.GSD_OPENCLAW_SESSION_ID ?? process.env.OPENCLAW_SESSION_ID;
   const timeout = process.env.GSD_OPENCLAW_TIMEOUT ?? process.env.OPENCLAW_TIMEOUT;
-  const thinking = process.env.GSD_OPENCLAW_THINKING ?? process.env.OPENCLAW_THINKING;
+  const thinking = process.env.GSD_OPENCLAW_THINKING ?? process.env.OPENCLAW_THINKING ?? "xhigh";
   const local = truthy(process.env.GSD_OPENCLAW_LOCAL ?? process.env.OPENCLAW_LOCAL);
   const json = truthy(process.env.GSD_OPENCLAW_JSON ?? process.env.OPENCLAW_JSON);
 
