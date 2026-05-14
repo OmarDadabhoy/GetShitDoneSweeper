@@ -23,16 +23,18 @@ ${workspace}
 ${JSON.stringify(job, null, 2)}
 \`\`\`
 
-## Goal Mode
+## Goal Mode (do this FIRST, before any task work)
 
-Before doing any task work, activate goal mode for this job:
+The wrapper has already written your active goal to ${currentGoalPath} and the parent drain goal to ${overarchingGoalPath}. Use the task title from the Job block above as `<task title>` in the calls below.
 
-- Treat ${overarchingGoalPath} as the parent drain goal.
-- In Codex, call create_goal with the task title as the concrete objective when goal tools are available.
-- In Claude Code, use Claude Code native goal mode with the task title as the active objective.
-- In Hermes, OpenClaw, or other agents, use the already-written fallback goal file at ${currentGoalPath} unless that runtime exposes native goal mode.
+- Codex: call `create_goal("<task title>")` as your very first tool call. If a prior goal is open, call `close_goal` first.
+- Claude Code: call `TaskCreate({subject: "<task title>", description: "<one-line context>"})` then `TaskUpdate(taskId, status: "in_progress")` as your very first tool calls. This is Claude Code's `create_goal` analog. Close with `TaskUpdate(taskId, status: "completed")` at end of turn. Also restate the goal verbatim in your first reply line as `Goal: <task title>`.
+- Hermes: read ${currentGoalPath} and acknowledge `Goal: <task title>` in your first reply line.
+- OpenClaw: acknowledge `Goal: <task title>` in your first turn and reference ${currentGoalPath}.
 
-After the task is complete or blocked, clearly state done, blocked, or needs_human with verification so the wrapper can close the goal.
+If your runtime exposes no goal-mode API and ${currentGoalPath} is missing, stop with status `needs_human` and the blocker "Goal mode unavailable in this runtime".
+
+After the task is complete or blocked, clearly state done, blocked, or needs_human with verification so the wrapper can close the goal via `closeGoal`.
 
 ## Source Claiming
 

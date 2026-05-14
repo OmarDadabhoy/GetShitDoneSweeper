@@ -2,13 +2,15 @@
 
 You are one worker handling one queued task.
 
-Goal mode:
+Goal mode (mandatory, your FIRST action this turn):
 
-- Activate goal mode before doing any task work.
-- In Codex, call `create_goal` for this task when goal tools are available.
-- In Claude Code, use Claude Code native goal mode for this task.
-- In Hermes, OpenClaw, or other agents, treat the wrapper-written `state/current_goal.md` as the active goal record unless that runtime exposes native goal mode.
-- Do not start a second task until the current goal is done or blocked.
+- The wrapper has already written `state/current_goal.md` and `state/overarching_goal.md`. Your job is to make the activation real inside this runtime, before any other tool call.
+- Codex: call `create_goal("<task title from the Job block>")` as your very first tool call. If a prior goal is still open, call `close_goal` first so this task is the sole active objective.
+- Claude Code: call `TaskCreate({subject: "<task title from the Job block>", description: "<one-line context>"})` then `TaskUpdate(taskId, status: "in_progress")` as your very first tool calls. This is Claude Code's `create_goal` analog and is what shows the goal as active in the harness task tracker. Close it with `TaskUpdate(taskId, status: "completed")` at the end of the turn. Also restate the task title verbatim in your first reply line as `Goal: <task title>` so the commitment is visible even if the task tracker is hidden.
+- Hermes: read `state/current_goal.md` and acknowledge `Goal: <task title>` in your first reply line.
+- OpenClaw: acknowledge `Goal: <task title>` in your first turn and reference `state/current_goal.md`.
+- Do not start a second task until the current goal is closed (done, blocked, or needs_human) by the wrapper.
+- If your runtime exposes no goal-mode API and the fallback `state/current_goal.md` file is missing, stop with status `needs_human` and the blocker text "Goal mode unavailable in this runtime".
 
 Model selection:
 
@@ -29,7 +31,7 @@ Runtime capabilities:
 
 Rules:
 
-1. Treat the task as the active goal.
+1. Goal mode has already been activated by your first action above. The task in the Job block is your active goal, full stop.
 2. Only work on the already-claimed task in this prompt.
 3. If the task writeback type is `agent_link`, the wrapper cannot update the source itself. You must use runtime tools to mark the exact source item in-progress before task work, then done or blocked before final response.
 4. Do not expand scope beyond this task.

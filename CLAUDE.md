@@ -6,7 +6,7 @@ When invoked here, use this loop:
 
 1. Read configured sources in `config/sources.json`.
 2. Create durable jobs in `state/jobs/queued`.
-3. Activate the overarching drain as the active goal in Claude Code native goal mode (`/goal`).
+3. Activate the overarching drain as the active goal in Claude Code via `TaskCreate({subject: "Drain configured todo sources", description: "Clear all actionable tasks"})` then `TaskUpdate(taskId, status: "in_progress")`. This is Claude Code's `create_goal` analog. Mark `completed` only when the drain finishes.
 4. Dispatch bounded local workers.
 5. Each worker claims its source item in-progress before execution.
 6. Each worker renders one focused prompt and invokes one agent process.
